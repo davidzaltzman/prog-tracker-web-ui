@@ -10,14 +10,20 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 edit_target = None  # זיכרון זמני לעריכה
 
+
 def read_file():
     url = f"https://api.github.com/repos/{GITHUB_USER}/{REPO_NAME}/contents/{FILE_PATH}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json"
+    }
     r = requests.get(url, headers=headers)
     if r.status_code != 200:
         return "", "", r.text
+
     data = r.json()
     return base64.b64decode(data["content"]).decode(), data["sha"], None
+
 
 def write_file(content, sha, msg):
     url = f"https://api.github.com/repos/{GITHUB_USER}/{REPO_NAME}/contents/{FILE_PATH}"
@@ -26,8 +32,12 @@ def write_file(content, sha, msg):
         "content": base64.b64encode(content.encode()).decode(),
         "sha": sha
     }
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json"
+    }
     requests.put(url, json=payload, headers=headers)
+
 
 def parse_threads(edit_url=None):
     content, _, _ = read_file()
@@ -49,9 +59,11 @@ def parse_threads(edit_url=None):
 
     return threads
 
+
 @app.route("/")
 def home():
     return render_template("index.html", threads=parse_threads(edit_target))
+
 
 @app.route("/add", methods=["POST"])
 def add():
@@ -65,10 +77,17 @@ def add():
     if url in content:
         return "❌ האשכול כבר קיים"
 
-    new_line = f"{title} | {url} | {request.form['bg_message']} | {request.form['bg_quote']} | {request.form['bg_spoiler']}"
+    new_line = (
+        f"{title} | {url} | "
+        f"{request.form['bg_message']} | "
+        f"{request.form['bg_quote']} | "
+        f"{request.form['bg_spoiler']}"
+    )
+
     content = content.rstrip() + "\n" + new_line + "\n"
     write_file(content, sha, f"Add thread: {title}")
     return redirect("/")
+
 
 @app.route("/toggle", methods=["POST"])
 def toggle():
@@ -89,11 +108,13 @@ def toggle():
     write_file("\n".join(lines) + "\n", sha, "Toggle thread")
     return redirect("/")
 
+
 @app.route("/edit-title", methods=["POST"])
 def edit_title():
     global edit_target
     edit_target = request.form["url"]
     return redirect("/")
+
 
 @app.route("/save-title", methods=["POST"])
 def save_title():
@@ -125,5 +146,7 @@ def save_title():
     edit_target = None
     return redirect("/")
 
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
